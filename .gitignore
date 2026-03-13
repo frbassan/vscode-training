@@ -1,0 +1,5 @@
+# Ignore HDF5 data files since they are large and generated locally
+*.h5
+__pycache__/
+*.csv
+.vscode/
