@@ -17,7 +17,7 @@ st.sidebar.header("1. Load File")
 file_path = st.sidebar.text_input("Path to .h5 File:", value="mock_febus_data_10k.h5")
 
 def get_h5_structure(filepath):
-    """Lê a estrutura do arquivo H5 e retorna grupos, datasets e atributos."""
+    """Reads the H5 file structure and returns groups, datasets, and attributes."""
     from typing import Any
     structure: dict[str, Any] = {"datasets": {}, "groups": [], "attributes": {}}
     
@@ -44,7 +44,7 @@ def get_h5_structure(filepath):
         return None, str(e)
 
 def parse_slice_string(slice_str):
-    """Converte uma string como '0, 450:550' em um objeto slice do Python."""
+    """Converts a string like '0, 450:550' into a Python slice object."""
     if not slice_str or slice_str.strip() == ":":
         return slice(None)
         
@@ -144,7 +144,7 @@ if 'file_path' in st.session_state:
                 with c2:
                      st.number_input("End", min_value=1, max_value=x_dim_size, key="x_end_input", on_change=update_from_inputs)
                 
-                # Sincronizado Slider
+                # Synchronized Slider
                 slice_range = st.slider("Or adjust visually:", 0, x_dim_size, key="x_slider", on_change=update_from_slider)
                 
                 x_slice = slice(slice_range[0], slice_range[1])
@@ -395,7 +395,7 @@ if 'file_path' in st.session_state:
                     
                 st.session_state['plot_data'] = df_export
                 
-                # --- Plot Principal ---
+                # --- Main Plot ---
                 fig, ax = plt.subplots(figsize=(10, 5))
                 alpha_orig = 0.3 if len(plots_to_make) > 0 else 1.0
                 ax.plot(data_x, data_y, label=f'Original ({py_name})', color='black', alpha=alpha_orig, linestyle='-' if alpha_orig == 1.0 else ':')
@@ -493,7 +493,7 @@ if 'file_path' in st.session_state:
                 st.error(f"Error processing filters or generating plot: {e}")
                 st.code(traceback.format_exc())
                 
-        # --- Seção 4: Exportação CSV ---
+        # --- Section 4: CSV Export ---
         if 'plot_data' in st.session_state:
             st.divider()
             st.header("4. Export Plot Data")

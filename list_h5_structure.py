@@ -2,32 +2,32 @@ import h5py
 
 def print_structure(name, obj):
     """
-    Função de callback que o h5py chama para cada item no arquivo.
+    Callback function called by h5py for each item in the file.
     """
-    # Calcula a indentação baseada no nível de profundidade (contando as barras '/')
+    # Calculates indentation based on depth level (counting '/' slashes)
     indent = "    " * name.count('/')
     
-    # Verifica se o item é um Grupo (como uma pasta)
+    # Checks if the item is a Group (like a folder)
     if isinstance(obj, h5py.Group):
-        print(f"{indent}📁 Grupo: {name}")
+        print(f"{indent}📁 Group: {name}")
     
-    # Verifica se o item é um Dataset (como uma planilha/matriz)
+    # Checks if the item is a Dataset (like a spreadsheet/matrix)
     elif isinstance(obj, h5py.Dataset):
-        print(f"{indent}📊 Dataset: {name} | Shape: {obj.shape} | Tipo: {obj.dtype}")
+        print(f"{indent}📊 Dataset: {name} | Shape: {obj.shape} | Type: {obj.dtype}")
 
-    # Lista os Atributos (metadados) associados a este item, se existirem
+    # Lists Attributes (metadata) associated with this item, if any
     for attr_name, attr_value in obj.attrs.items():
-        print(f"{indent}    🏷️ Atributo: {attr_name} = {attr_value}")
+        print(f"{indent}    🏷️ Attribute: {attr_name} = {attr_value}")
 
-# Nome do arquivo que você deseja explorar
-nome_do_arquivo = 'mock_febus_data.h5' 
+# Name of the file you want to explore
+file_name = 'mock_febus_data.h5' 
 
 try:
-    with h5py.File(nome_do_arquivo, 'r') as f:
-        print(f"Estrutura Hierárquica do Arquivo: {nome_do_arquivo}\n")
-        # O visititems percorre cada objeto e chama a função print_structure
+    with h5py.File(file_name, 'r') as f:
+        print(f"Hierarchical File Structure: {file_name}\n")
+        # visititems iterates over each object and calls print_structure
         f.visititems(print_structure)
 except FileNotFoundError:
-    print(f"Erro: O arquivo '{nome_do_arquivo}' não foi encontrado.")
+    print(f"Error: File '{file_name}' not found.")
 except Exception as e:
-    print(f"Ocorreu um erro ao ler o arquivo: {e}")
+    print(f"An error occurred while reading the file: {e}")
