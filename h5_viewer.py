@@ -5,16 +5,62 @@ import pandas as pd
 import matplotlib.pyplot as plt
 import plotly.graph_objects as go
 import os
-st.set_page_config(page_title="HDF5 Data Viewer", layout="wide")
+import sys
 
-st.title("HDF5 Data Viewer 📊")
-st.markdown("Explore, slice, plot, and export HDF5 data directly from your browser.")
+def get_asset_path(filename):
+    if getattr(sys, 'frozen', False):
+        return os.path.join(sys._MEIPASS, filename)
+    return os.path.join(os.path.dirname(os.path.abspath(__file__)), filename)
+
+st.set_page_config(page_title="HDF5 Data Viewer", layout="wide", page_icon=get_asset_path("logo.png"))
+
+c1, c2 = st.columns([1, 8])
+with c1:
+    try:
+        st.image(get_asset_path("logo.png"), use_container_width=True)
+    except:
+        pass
+with c2:
+    st.title("HDF5 Data Viewer 📊")
+    st.markdown("Explore, slice, plot, and export HDF5 data directly from your browser.")
 
 # ---------------------------------------------------------
 # Sidebar: File Loading
 # ---------------------------------------------------------
 st.sidebar.header("1. Load File")
-file_path = st.sidebar.text_input("Path to .h5 File:", value="Simulated_FiberTest_TSB.h5")
+
+if 'selected_file_path' not in st.session_state:
+    st.session_state['selected_file_path'] = "Simulated_FiberTest_TSB.h5"
+
+c_path, c_btn = st.sidebar.columns([5, 1])
+
+with c_btn:
+    st.markdown("<br>", unsafe_allow_html=True)
+    if st.button("📁", help="Browse for file..."):
+        try:
+            import tkinter as tk
+            from tkinter import filedialog
+            root = tk.Tk()
+            root.wm_attributes('-topmost', 1)
+            root.withdraw()
+            chosen_path = filedialog.askopenfilename(
+                title="Select HDF5 File", 
+                filetypes=[("HDF5 Files", "*.h5 *.hdf5"), ("All Files", "*.*")]
+            )
+            root.destroy()
+            if chosen_path:
+                st.session_state['selected_file_path'] = chosen_path
+                st.rerun()
+        except Exception as e:
+            st.error(f"Explorer failed: {e}")
+
+with c_path:
+    # A caixa reflete o state e permite digitação manual
+    user_input = st.text_input("Path to .h5 File:", value=st.session_state['selected_file_path'])
+    if user_input != st.session_state['selected_file_path']:
+        st.session_state['selected_file_path'] = user_input
+
+file_path = st.session_state['selected_file_path']
 
 def get_h5_structure(filepath):
     """Reads the H5 file structure and returns groups, datasets, and attributes."""
@@ -97,41 +143,48 @@ if 'file_path' in st.session_state:
     else:
         st.success(f"File loaded successfully! ({st.session_state['file_path']})")
         
-        # --- Section 1: Metadata and Structure ---
-        with st.expander("View File Structure & Metadata", expanded=False):
-            st.subheader("Global Attributes (Root)")
-            if struct["attributes"]:
-                import datetime
-                attrs_to_show = struct["attributes"].copy()
-                ordered_attrs = {}
-                
-                for key_time in ['start_time', 'end_time']:
-                    raw_val = attrs_to_show.pop(key_time, None)
-                    if raw_val is not None:
-                        try:
-                            ts = float(raw_val[0] if isinstance(raw_val, list) else raw_val)
-                            ordered_attrs[key_time] = f"{ts} ---> ({datetime.datetime.fromtimestamp(ts).strftime('%d/%m/%Y %H:%M:%S')})"
-                        except:
-                            ordered_attrs[key_time] = raw_val
-                
-                # Coloca o restante dos atributos abaixo
-                for k, v in attrs_to_show.items():
-                    ordered_attrs[k] = v
-                    
-                st.json(ordered_attrs)
-            else:
-                st.info("No global attributes found.")
-                
-            st.subheader("Available Datasets")
-            for ds_name, info in struct["datasets"].items():
-                st.markdown(f"**`{ds_name}`** | Shape: `{info['shape']}` | Type: `{info['dtype']}`")
-                if info['attrs']:
-                    st.json(info['attrs'])
+        tab1, tab2, tab3, tab4, tab5 = st.tabs([
+            "1. Metadata & Structure", 
+            "2. Temperature (2D)", 
+            "3. Strain (2D)", 
+            "4. Temperature (3D Map)", 
+            "5. Strain (3D Map)"
+        ])
         
-        st.divider()
+        with tab1:
+            # --- Section 1: Metadata and Structure ---
+            with st.expander("View File Structure & Metadata", expanded=True):
+                st.subheader("Global Attributes (Root)")
+                if struct["attributes"]:
+                    import datetime
+                    attrs_to_show = struct["attributes"].copy()
+                    ordered_attrs = {}
+                    
+                    for key_time in ['start_time', 'end_time']:
+                        raw_val = attrs_to_show.pop(key_time, None)
+                        if raw_val is not None:
+                            try:
+                                ts = float(raw_val[0] if isinstance(raw_val, list) else raw_val)
+                                ordered_attrs[key_time] = f"{ts} ---> ({datetime.datetime.fromtimestamp(ts).strftime('%d/%m/%Y %H:%M:%S')})"
+                            except:
+                                ordered_attrs[key_time] = raw_val
+                    
+                    # Coloca o restante dos atributos abaixo
+                    for k, v in attrs_to_show.items():
+                        ordered_attrs[k] = v
+                        
+                    st.json(ordered_attrs)
+                else:
+                    st.info("No global attributes found.")
+                    
+                st.subheader("Available Datasets")
+                for ds_name, info in struct["datasets"].items():
+                    st.markdown(f"**`{ds_name}`** | Shape: `{info['shape']}` | Type: `{info['dtype']}`")
+                    if info['attrs']:
+                        st.json(info['attrs'])
         
 
-        def render_2d_analysis_module(struct, section_num, section_title, y_dataset, x_dataset="distances"):
+        def render_2d_analysis_module(struct, section_num, section_title, y_dataset, x_dataset="distances", ymin=None, ymax=None):
             import datetime
             from scipy.signal import butter, filtfilt, savgol_filter, medfilt
             import numpy as np
@@ -305,6 +358,8 @@ if 'file_path' in st.session_state:
                     ax.set_xlabel(x_dataset, labelpad=15, loc='center') # O loc center e labelpad que colocamos
                     ax.set_ylabel(y_dataset, labelpad=20, loc='center')
                     ax.set_title(f"2D Signal Profile: {section_title} ({y_dataset} vs {x_dataset})", pad=20)
+                    if ymin is not None and ymax is not None:
+                        ax.set_ylim([ymin, ymax])
                     ax.grid(True, linestyle='--', alpha=0.7)
                     ax.legend()
                     st.pyplot(fig)
@@ -317,10 +372,12 @@ if 'file_path' in st.session_state:
                 except Exception as e:
                     st.error(f"Plotting Error: {e}")
 
-        # Iniciar as renderizações independentes!
-        render_2d_analysis_module(struct, section_num=2, section_title="Temperature 2D Analysis", y_dataset="temp_data")
-        st.divider()
-        render_2d_analysis_module(struct, section_num=3, section_title="Strain 2D Analysis", y_dataset="strain_data")
+        # Iniciar as renderizações independentes nas Abas!
+        with tab2:
+            render_2d_analysis_module(struct, section_num=2, section_title="Temperature 2D Analysis", y_dataset="temp_data", ymin=-50, ymax=200)
+            
+        with tab3:
+            render_2d_analysis_module(struct, section_num=3, section_title="Strain 2D Analysis", y_dataset="strain_data", ymin=-2000, ymax=2000)
 
         # --- Helper for 3D Surface Plots ---
         def plot_3d_surface(file_path, dataset_name, x_dataset, title, z_unit, colorscale, zmin=None, zmax=None):
@@ -421,25 +478,23 @@ if 'file_path' in st.session_state:
                 except Exception as e:
                     st.error(f"Error drawing 3D surface: {e}")
 
-        # --- Section 5: 3D Surface Graph (Temperature) ---
-        st.divider()
-        st.header("4. 3D Surface Graph ( Temperature )")
-        if "temp_data" in struct["datasets"]:
-            st.write("Real-time 3D topographic visualization of Temperature.")
-            if st.checkbox("Show / Generate Temperature 3D Surface", value=False):
-                plot_3d_surface(st.session_state['file_path'], "temp_data", "distances", "3D Surface Topography: Temperature", "Temperature (°C)", "Turbo", zmin=-50, zmax=200)
-        else:
-             st.info("The 'temp_data' dataset was not found in this file.")
+        with tab4:
+            st.header("4. 3D Surface Graph ( Temperature )")
+            if "temp_data" in struct["datasets"]:
+                st.write("Real-time 3D topographic visualization of Temperature.")
+                if st.checkbox("Show / Generate Temperature 3D Surface", value=False):
+                    plot_3d_surface(st.session_state['file_path'], "temp_data", "distances", "3D Surface Topography: Temperature", "Temperature (°C)", "Turbo", zmin=-50, zmax=200)
+            else:
+                 st.info("The 'temp_data' dataset was not found in this file.")
 
-        # --- Section 6: 3D Surface Graph (Strain) ---
-        st.divider()
-        st.header("5. 3D Surface Graph ( Strain )")
-        if "strain_data" in struct["datasets"]:
-            st.write("Real-time 3D topographic visualization of Strain.")
-            if st.checkbox("Show / Generate Strain 3D Surface", value=False):
-                plot_3d_surface(st.session_state['file_path'], "strain_data", "distances", "3D Surface Topography: Strain", "Strain (µe)", "Viridis", zmin=-2000, zmax=2000)
-        else:
-             st.info("The 'strain_data' dataset was not found in this file.")
+        with tab5:
+            st.header("5. 3D Surface Graph ( Strain )")
+            if "strain_data" in struct["datasets"]:
+                st.write("Real-time 3D topographic visualization of Strain.")
+                if st.checkbox("Show / Generate Strain 3D Surface", value=False):
+                    plot_3d_surface(st.session_state['file_path'], "strain_data", "distances", "3D Surface Topography: Strain", "Strain (µe)", "Viridis", zmin=-2000, zmax=2000)
+            else:
+                 st.info("The 'strain_data' dataset was not found in this file.")
             
 else:
     st.info("Enter the file path in the sidebar and click 'Load'.")
